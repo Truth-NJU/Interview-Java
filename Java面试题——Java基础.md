@@ -1283,7 +1283,7 @@ Handler:也就是处理器。它直接应对着MVC中的C也就是Controller层�
 
 
 
-## **如何理解** **Spring Boot** **中的** **Starter
+## 如何理解Spring Boot中的Starter
 
 使用spring + springmvc使用，如果需要引入mybatis等框架，需要到xml中定义mybatis需要的bean
 
