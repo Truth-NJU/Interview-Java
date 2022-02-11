@@ -400,7 +400,14 @@ RunTimeException常常发生在程序运行过程中，会导致程序当前线�
 
 
 
-## **Java类加载器**
+## 泛型中extends和super的区别
+
+1. <? extends T>表示包括T在内的任何T的子类
+2. <? super T>表示包括T在内的任何T的父类
+
+
+
+## Java类加载器
 
 JDK自带有三个类加载器:bootstrap ClassLoader、ExtClassLoader、AppClassLoader。 
 
@@ -422,6 +429,26 @@ AppClassLoader是自定义类加载器的父类，负责加载classpath下的类
 
 主要是为了安全性，避免用户自己编写的类动态替换 Java的一些核心类，比如 String。 同时也避免了类的重复加载，因为 JVM中区分不同类，不仅仅是根据类名，相同的 class文件被不 同的 ClassLoader加载就是不同的两个类
 
+
+
+**另一种解释**
+
+JVM中存在三个默认的类加载器:
+
+1. BootstrapClassLoader
+
+2. ExtClassLoader
+
+3. AppClassLoader
+
+AppClassL oader的父加载器是ExtClassl oader，ExtClassL oader的父加载器是
+BootstrapClassL oader。
+
+JVM在加载一个类时，会调用AppClassLoader的loadClass方法来加载这个类，不过在这个方法中， 会先使用ExtClassL oader的loadClass方法来加载类，同样ExtClassL oader的loadClass方法中会先使用
+BootstrapClassLoader来加载类，如果BootstrapClassL oader加载到了就直接成功，如果
+BootstrapClassL oader没有加载到，那么ExtClassLoader就会自己尝试加载该类，如果没有加载到，那么则会由AppClassLoader来加载这个类。
+
+所以，双亲委派指得是，JVM在加载类时，会委派给Ext和Bootstrap进行加载，如果没加载到才由自己进行加载。
 
 
 ## GC如何判断对象可以被回收
@@ -448,7 +475,312 @@ GC Roots的对象有:
 
 
 
+## 说一下ArrayList和LinkedList区别
+
+1. 首先，他们的底层数据结构不同，ArrayList底层是基于数组实现的，LinkedList底层是基于链表实现的
+2. 由于底层数据结构不同，他们所适用的场景也不同，ArrayList更适合随机查找，LinkedList更适合删除和添加，查询、添加、删除的时间复杂度不同
+3. 另外ArrayList和LinkedList都实现了List接口，但是LinkedList还额外实现了Deque接口，所以
+   LinkedList还可以当做队列来使用.
+
+
+
+## 说一下HashMap的Put方法
+
+先说HashMap的Put方法的大体流程:
+
+1. 根据Key通过哈希算法与与运算得出数组下标
+2. 如果数组下标位置元素为空，则将key和value封装为Entry对象(JDK1.7中 是Entry对象，JDK1.8中是Node对象)并放入该位置
+3. 如果数组下标位置元素不为空，则要分情况讨论
+   - 如果是JDK1.7，则先判断是否需要扩容，如果要扩容就进行扩容，如果不用扩容就生成Entry对象，并使用头插法添加到当前位置的链表中
+   - 如果是JDK1.8，则会先判断当前位置上的Node的类型，看是红黑树Node,还是链表Node
+     - 如果是红黑树Node，则将key和value封装为一个红黑树节点并添加到红黑树中去，在这个过程中会判断红黑树中是否存在当前key,如果存在则更新value:
+     - 如果此位置上的Node对象是链表节点，则将key和value封装为一 个链表Node并通过尾插法插入到链表的最后位置去，因为是尾插法，所以需要遍历链表，在遍历链表的过程中会判断是否存在当前key,如果存在则更新value，当遍历完链表后，将新链表Node插入到链表中，插入到链表后，会看当前链表的节点个数，如果大于等于8，那么则会将该链表转成红黑树
+     - 将key和value封装为Node插入到链表或红黑树中后，再判断是否需要进行扩容，如果需要就扩容，如果不需要就结束PUT方法
+
+
+
+## 说一下JVM中，哪些是共享区，哪些可以作为gc root
+
+1. 堆区和方法区是所有线程共享的，栈、本地方法栈、程序计数器是每个线程独有的
+
+   <img src="img/28.png" alt="28" style="zoom:50%;" />
+
+2. 什么是gc root, JVM在进行垃圾回收时，需要找到“垃圾”对象，也就是没有被引用的对象，但是直接
+   找“垃圾”对象是比较耗时的，所以反过来，先找“非垃圾”对象，也就是正常对象，那么就需要从某
+   些“根”开始去找，根据这些“根”的引用路径找到正常对象，而这些“根”有一个特征，就是它只会引用其他对象，而不会被其他对象引用，例如:栈中的本地变量、方法区中的静态变量、本地方法栈中的变量、正在运行的线程等可以作为gc root。
+
+
+
+## 你们项目如何排查JVM问题
+
+对于还在正常运行的系统:（通过一些指令或工具来监控正常运行的系统）
+
+1. 可以使用jmap来查看JVM中各个区域的使用情况
+2. 可以通过jstack来查看线程的运行情况，比如哪些线程阻塞、是否出现了死锁
+3. 可以通过jstat命令来查看垃圾回收的情况，特别是fullgc，如果发现fullgc比较频繁，那么就得进行调优了
+4. 通过各个命令的结果，或者jvisualvm等工具来进行分析
+5. 首先，初步猜测频繁发送fullgc的原因，如果频繁发生fullgc但是又-直没有出现内存溢出，那么表示fullgc实际上是回收了很多对象了，所以这些对象最好能在younggc过程中就直接回收掉，避免这些对象进入到老年代，对于这种情况，就要考虑这些存活时间不长的对象是不是比较大，导致年轻代放不下，直接进入到了老年代，尝试加大年轻代的大小，如果改完之后，fullgc减少， 则证明修改有效
+6. 同时，还可以找到占用CPU最多的线程，定位到具体的方法，优化这个方法的执行，看是否能避免某些对象的创建，从而节省内存
+
+
+
+对于已经发生了OOM（out of memory内存溢出）的系统:
+
+1. 一般生产系统中都会设置当系统发生了OOM时，生成当时的dump文件(-
+   XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/usr/local/base)
+2. 我们可以利用jsisualvm等工具来分析dump文件
+3. 根据dump文件找到异常的实例对象，和异常的线程(占用CPU高)，定位到具体的代码
+4. 然后再进行详细的分析和调试
+
+
+
+总之，调优不是一蹴而就的，需要分析、推理、实践、总结、再分析，最终定位到具体的问题。
+
+
+
+## Jdk1.7到Jdk1.8 HashMap发生了什么变化(底层)?
+
+1. 1.7中底层是数组+链表，1.8中底层是数组+链表+红黑树，加红黑树的目的是提高HashMap插入和查询整体效率
+2. 1.7中链表插入使用的是头插法，1.8中链表插入使用的是尾插法，因为1.8中插入key和value时需要判断链表元素个数，所以需要遍历链表统计链表元素个数，所以正好就直接使用尾插法
+3. 1.7中哈希算法比较复杂，存在各种右移与异或运算，1.8中进行了 简化，因为复杂的哈希算法的目的就是提高散列性，来提供HashMap的整体效率，而1.8中新增了红黑树，所以可以适当的简化哈希算法,节省CPU资源
+
+
+
+## Jdk1.7到Jdk1.8 java 虚拟机发生了什么变化?
+
+1.7中存在永久代，1.8中没有永久代，替换它的是元空间，元空间所占的内存不是在虚拟机内部，而是本地内存空间，这么做的原因是，不管是永久代还是元空间，他们都是方法区的具体实现，之所以元空间所占的内存改成本地内存，官方的说法是为了和JRockit统一，不过额外还有一些原因，比如方法区所存储的类信息通常是比较难确定的，所以对于方法区的大小是比较难指定的，太小了容易出现方法区溢出，太大了又会占用了太多虚拟机的内存空间，而转移到本地内存后则不会影响虚拟机所占用的内存
+
+
+
+## 深拷贝和浅拷贝
+
+深拷贝和浅拷贝就是指对象的拷贝，一个对象中存在两种类型的属性，-种是基本数据类型，一种是实例对象的引用。
+
+1. 浅拷贝是指，只会拷贝基本数据类型的值，以及实例对象的引用地址，并不会复制一份引用地址所指向的对象，也就是浅拷贝出来的对象，内部的类属性指向的是同一个对象
+2. 深拷贝是指，既会拷贝基本数据类型的值，也会针对实例对象的引用地址所指向的对象进行复制，深拷贝出来的对象，内部的属性指向的不是同一个对象
+
+
+
+## 谈谈ConcurrentHashMap的扩容机制
+
+1.7版本
+
+1. 1.7版本的ConcurrentHashMap是基于Segment分段实现的
+2. 每个Segment相对于一个小型的HashMap
+3. 每个Segment内部会进行扩容，和HashMap的扩 容逻辑类似
+4. 先生成新的数组，然后转移元素到新数组中
+5. 扩容的判断也是每个Segment内部单独判断的，判断是否超过阈值
+
+1.8版本
+
+1. 1.8版本的ConcurrentHashMap不再基于Segment实现
+2. 当某个线程进行put时，如果发现ConcurrentHashMap正在进行扩容那么该线程. -起进行扩容
+3. 如果某个线程put时，发现没有正在进行扩容，则将key-value添 加到ConcurrentHashMap中，然后判断是否超过阈值，超过了则进行扩容
+4. ConcurrentHashMap是支持多个线程同时扩容的
+5. 扩容之前也先生成-个新的数组
+6. 在转移元素时，先将原数组分组，将每组分给不同的线程来进行元素的转移，每个线程负责-组或多组.的元素转移工作
+
+
+
+## TCP的三次握手和四次挥手
+
+TCP协议是7层网络协议中的传输层协议，负责数据的可靠传输。
+
+在建立TCP连接时，需要通过三次握手来建立,过程是:
+
+1. 客户端向服务端发送一个SYN
+2. 服务端接收到SYN后，给客户端发送-个SYN_ ACK
+3. 客户端接收到SYN_ _ACK后，再给服务端发送一个ACK
+
+
+
+在断开TCP连接时，需要通过四次挥手来断开，过程是:
+
+1. 客户端向服务端发送FIN
+2. 服务端接收FIN后，向客户端发送ACK，表示我接收到了断开连接的请求，客户端你可以不发数据了，不过服务端这边可能还有数据正在处理
+3. 服务端处理完所有数据后，向客户端发送FIN，表示服务端现在可以断开连接
+4. 客户端收到服务端的FIN,向服务端发送ACK,表示客户端也会断开连接了
+
+
+
+## 二叉搜索树和平衡二叉树有什么关系?
+
+平衡二叉树也叫做平衡二叉搜索树，是二叉搜索树的升级版，二叉搜索树是指节点左边的所有节点都比该节点小，节点右边的节点都比该节点大，而平衡二叉搜索树是在二叉搜索的基础上还规定了节点左右两边的子树高度差的绝对值不能超过1
+
+
+
+## 强平衡二叉树和弱平衡二叉树有什么区别
+
+[教学](https://blog.csdn.net/u010899985/article/details/80981053?spm=1001.2101.3001.6650.1&utm_medium=distribute.pc_relevant.none-task-blog-2%7Edefault%7EBlogCommendFromBaidu%7Edefault-1.pc_relevant_default&depth_1-utm_source=distribute.pc_relevant.none-task-blog-2%7Edefault%7EBlogCommendFromBaidu%7Edefault-1.pc_relevant_default&utm_relevant_index=2)
+
+强平衡二叉树AVL树，弱平衡二叉树就是我们说的红黑树。
+
+1. AVL树比红黑树对于平衡的程度更加严格，在相同节点的情况下，AVL树的高度低于红黑树
+2. 红黑树中增加了一个节点颜色的概念
+3. AVL树的旋转操作比红黑树的旋转操作更耗时
+
+
+
+
+
+## epoll和poll的区别
+
+1. select模型，使用的是数组来存储Socket连接文件描述符，容量是固定的，需要通过轮询来判断是否发生了IO事件
+2. poll模型，使用的是链表来存储Socket连接文件描述符，容量是不固定的，同样需要通过轮询来判断是否发生了IO事件
+3. epolI模型，epoll和poll是完全不同的，epoll是一种事件通知模型，当发生了IO事件时，应用程序才进行IO操作，不需要像polI模型那样主动去轮询
+
+
+
+## HTTPS是如何保证安全传输的
+
+https通过使用对称加密、非对称加密、数字证书等方式来保证数据的安全传输。
+
+1. 客户端向服务端发送数据之前，需要先建立TCP连接。所以需要先建立TCP连接。建立完TCP连接后，服务端会先给客户端发送公钥，客户端拿到公钥后就可以用来加密数据了，服务端到时候接收到数据就可以用私钥解密数据，这种就是通过非对称加密来传输数据
+2. 不过非对称加密比对称加密要慢，所以不能直接使用非对称加密来传输请求数据，所以可以通过非对称加密的方式来传输对称加密的秘钥。之后就可以使用对称加密来传输请求数据了
+3. 但是仅仅通过非对称加密+对称加密还不足以能保证数据传输的绝对安全，因为服务端向客户端发送公钥时，可能会被截取
+4. 所以为了安全的传输公钥，需要用到数字证书，数字证书是具有公信力、大家部认可的，服务鏰向客户端发送公钥时，可以把公钥和服务端相关信息通过Hash算法生成消息摘要，再通过数宇证书提供的私钥对消息摘要进行加密生成数字签名，在把没进行Hash算法之前的信息和数字签名-起形成数字证书。最后把数字证书发送结客户端。 客户端收到数字证书后。就会通过数字证书提供的公钥来解密数字证书，从而得到非对称加密要用到的公钥。
+5. 在这个过程中，就算有中间人拦截到服务端发出来的数字证书，虽然它可以解密得到非对称加密要使用的公钥，但是中间人是办法伪造数字证书发给客户端的，因为客户端上内嵌的数字证书是全球具有公信力的，某个网站如果要支持https,都是需要申请数字证书的私钥的，中间人如果要生成能被客户端解析的数字证书，也是要申请私钥的。所以是比较安全了。
+
+
+
+
+
+## volatile关键字，他是如何保证可见性，有序性
+
+1. 对于加了volatile关键字的成员变量，在对这个变量进行修改时，会直接将CPU高级缓存中的数据写回到主内存，对这个变量的读取也会直接从主内存中读取，从而保证了可见性
+2. 在对volatile修饰的成员变量进行读写时，会插入内存屏障，而内存屏障可以达到禁止重排序的效果,从而可以保证有序性
+
+
+
+## Java的内存结构，堆分为哪几部分，默认年龄多大进入老年代
+
+1. 年轻代
+   - Eden区(8)
+   - From Survivor区(1)
+   - To Survivor区(1)
+2. 老年代
+
+默认对象的年龄达到15后，就会进入老年代
+
+
+
+
+
+# 设计模式
+
+## 遇到过哪些设计模式?
+
+在学习一些框架或中间件的底层源码的时候遇到过一些设计模式:
+
+1. 代理模式: Mybatis中用到JDK动态代理来生成Mapper的代理对象，在执行代理对象的方法时会去执行SQL，Spring中AOP、 包括@Configuration注 解的底层实现也都用到了代理模式
+2. 责任链模式: Tomcat中的Pipeline实现，以及Dubbo中 的Filter机制都使用了责任链模式
+3. 工厂模式: Spring中的BeanFactory就是-种工厂模式的实现
+4. 适配器模式: Spring中的Bean销毁的生命周期中用到了适配器模式，用来适配各种Bean销毁逻辑的执行方式
+5. 外观模式: Tomcat中的Request和RequestFacade之间体现的就是外观模式
+6. 模板方法模式: Spring中的refresh方法中就提供了给子类继承重写的方法，就用到了模板方法模式
+
+
+
+## 设计模式有哪些大类，及熟悉其中哪些设计模式
+
+设计模式分为三大类:
+
+1. 创建型
+   - 工厂模式(Factory Patterm
+   - 抽象工厂模式(Abstract Factory Pattern)
+   - 单例模式(Singleton Pattern)
+   - 建造者模式(Builder Pattern)
+   - 原型模式(Prototype Pattern)
+2. 结构型
+   - 适配器模式(Adapter Pattermn)
+   - 桥接模式(Bridge Pattern)
+   - 过滤器模式(Filter. Criterla Pattern)
+   - 组合模式(Composite Pattern)
+   - 装饰器模式(Decorator Patterm)
+   - 外观模式(Facade Pattern)
+   - 享元模式(Flywelght Pattem)
+   - 代理模式(Proxy Pattern)
+3. 行为型
+   - 责任链模式(Chain of Resposiblity Patterm)
+   - 命令模式(Command Patterm)
+   - 解释器模式(Interpreter Pattern)
+   - 迭代器模式(Iterator Patterm)
+   - 中介者模式(Mediator Pattern)
+   - 备忘录模式(Memento Pattern)
+   - 观察者模式
+   - 状态模式
+   - 空对象模式
+   - 策略模式
+   - 模板模式
+   - 访问者模式
+
 # 线程、并发
+
+## Java死锁如何避免?
+
+造成死锁的几个原因:
+
+1. 一个资源每次只能被一个线程使用
+2. 一个线程在阻塞等待某个资源时，不释放已占有资源
+3. 一个线程已经获得的资源，在未使用完之前，不能被强行剥夺
+4. 若干线程形成头尾相接的循环等待资源关系
+
+这是造成死锁必须要达到的4个条件，如果要避免死锁，只需要不满足其中某- -个条件即可。而其中前3个条件是作为锁要符合的条件，所以要避免死锁就需要打破第4个条件，不出现循环等待锁的关系。
+
+
+
+在开发过程中:
+
+1. 要注意加锁顺序，保证每个线程按同样的顺序进行加锁
+2. 要注意加锁时限，可以针对所设置-个超时时间
+3. 要注意死锁检查,这是-种预防机制，确保在第--时间发现死锁并进行解决
+
+
+
+
+
+## 如何查看线程死锁
+
+1. 可以通过jstack命令来进行查看，jstack命 令中会显示发生了死锁的线程
+
+2. 或者两个线程去操作数据库时，数据库发生了死锁，这是可以查询数据库的死锁情况
+
+   ```
+   1、查询是否锁表
+   show OPEN TABLES where In_ _use > 0;
+   2、查询进程
+   show processlist;
+   3、查看正在锁的事务
+   SELECT * FROM INFORMATION_ SCHEMA. INNODB_ .LOCKS ;
+   4、查看等待锁的事务
+   SELECT * FROM INFORMATION_ SCHEMA. INNODB_ LOCK_ WAITS;
+   ```
+
+   
+
+## 线程之间如何进行通讯的
+
+1. 线程之间可以通过共享内存或基于网络来进行通信
+2. 如果是通过共享内存来进行通信，则需要考虑并发问题，什么时候阻塞，什么时候唤醒
+3. 像Java中的wait()、notify()就 是阻塞和唤醒
+4. 通过网络就比较简单了，通过网络连接将通信数据发送给对方，当然也要考虑到并发问题，处理方式就是加锁等方式
+
+
+
+## 说一下ThreadLocal
+
+1. ThreadLocal是Java中所提供的线程本地存储机制，可以利用该机制将数据缓存在某个线程内部，该线程可以在任意时刻、任意方法中获取缓存的数据
+2. ThreadL ocal底层是通过ThreadL ocalMap来实现的，每个Thread对象(注意不是ThreadLocal
+对象)中都存在一个ThreadL ocalMap, Map的key为 ThreadL ocal对象，Map的value为需要缓
+存的值
+2. 如果在线程池中使用ThreadLocal会造成内存泄漏，因为当ThreadLocal对象使用完之后，应该
+要把设置的key,value，也就是Entry对象进行回收，但线程池中的线程不会回收，而线程对象
+是通过强引用指向ThreadL ocalMap, ThreadL ocalMap也是通过强引用指向Entry对象，线程
+不被回收，Entry对 象也就不会被回收，从而出现内存泄漏，解决办法是，在使用了
+ThreadLocal对象之后，手动调用ThreadL ocal的remove方法，手动清楚Entry对象
+4. ThreadL ocal经典的应用场景就是连接管理(一个线程持有一个连接，该连接对象可以在不同的方法之间进行传递，线程之间不共享同一个连接)
+
+![27](img/27.png)
 
 ## 线程的生命周期?线程有几种状态
 
@@ -627,6 +959,46 @@ Java自带的多线程框架，比如ExecutorService，会将守护线程转换�
 
 
 
+## 简述线程池原理，FixedThreadPool用的阻塞队列是什么
+
+线程池内部是通过队列+线程实现的，当我们利用线程池执行任务时:
+
+1. 如果此时线程池中的数量小于corePoolSize,即使线程池中的线程都处于空闲状态，也要创建新的线
+   程来处理披源加的任务。
+2. 如果此时线程池中的数量等于corePoolSize, 但是暖冲队列workQueue未满， 那么任务破放入缓冲队列。
+3. 如果此时线程池中的数量大于等于coroPoolSlze,缓冲队列workGuvue满，井且线程池中的数量小于maximumPoolSize,建新的线程来处理被添加的任务。
+4. 如果此时线程池中的数量大于corePoolSize，缓冲队列workQueue澜。并且线程池中的数量等于
+   maximumPoolSize,那么通过handler所指定的實略來处理此任务。
+5. 当线程池中的线程数量大于corePoolsize时， 如果某线程空闲时间超过HkpAliveTime,线程将被终
+   止。这样。线程池可以动态的调整池中的线程数
+
+FixedThreadPool代表定长线程池，底展用的LinkedBlockingQueue,表示无界的阻塞队列。
+
+
+
+## sychronized和ReentrantLock的区别
+
+1. sychronized是一个关键字，ReentrantLock是一一个类
+2. sychronlzed会自动的加锁与释故锁，ReentrantLock需 要程序员手动加锁与释放锁
+3. Bychronized的底展是JVM层面的锁，ReentrantLock是API展面的锁
+4. sychronized是非公平锁。ReentrantL ock可以选择公平锁或非公平锁
+5. syhronized锁的是对象。锁信息保存在对象头中，ReentrantL ock通过代码中int类型的state标识来标识锁的状态
+6. sychronized底展有一个锁升级的过程
+
+
+
+## sychronized的自旋锁、偏向锁、轻量级锁、重量级锁，分别介绍和联系
+
+1. 偏向锁:在锁对象的对象头中记录一下当前获取到该锁的线程ID,该线程下次如果又来获取该锁就可以直接获取到了
+
+2. 轻量级锁:由偏向锁升级而来，当-一个线程获取到锁后，此时这把锁是偏向锁，此时如果有第二个线程来竟争锁，偏向锁就会升级为轻量级锁，之所以叫轻量级锁，是为了和重量级锁区分开来，轻量级锁底层是通过自旋来实现的，并不会阻塞线程
+
+3. 如果自旋次数过多仍然没有获取到锁，则会开级为重量级锁。重量级锁会导致线程阳塞
+
+4. 自旋锁:自旋锁就是线程在获取锁的过程中，不会去阻塞线程，也就无所谓唤醒线程，阻塞和唤醒这两个步骤都是需要操作系统去进行的。比较消耗时间，自旋锁是线程通过CAS获取预期的一个标记， 如果没有获取到，则继续循环获取，如果获取到了则表示获取到了锁，这个过程线程一直在运行中， 相对而言没有使用太多的操作系统资源，比较轻量。
+
+   
+
 ## ThreadLocal的原理和使用场景
 
 每一个 Thread 对象均含有一个 ThreadLocalMap 类型的成员变量 threadLocals ，它存储本线程中所 有ThreadLocal对象及其对应的值
@@ -698,6 +1070,14 @@ ThreadLocal正确的使用方法
 
 - 每次使用完ThreadLocal都调用它的remove()方法清除数据
 - 将ThreadLocal变量定义成private static，这样就一直存在ThreadLocal的强引用，也就能保证任 何时候都能通过ThreadLocal的弱引用访问到Entry的value值，进而清除掉 。
+
+
+
+## 如果你提交任务时，线程池队列已满，这时会发生什么
+
+1. 如果使用的无界队列，那么可以继续提交任务时没关系的
+2. 如果使用的有界队列，提交任务时，如果队列满了，如果核心线程数没有达到上限，那么则增加线程，
+3. 如果线程数已经达到了最大值，则使用拒绝策略进行拒绝
 
 
 
@@ -895,406 +1275,21 @@ java.util.concurrent包里面的锁)，因为volatile的总开销要比锁低。
 
 
 
-# spring
 
-## 如何实现一个IOC容器
 
-1. 配置文件配置包扫描路径
-2. 递归包扫描获取.class文件
-3. 反射、确定需要交给IOC管理的类
-4. 对需要注入的类进行依赖注入
+# 其他
 
+## 说说你常用的Linux基本操作命令
 
+1. 增删查改
+2. 防火墙相关
+3. ssh/scp
+4. 软件下载、解压、安装
+5. 修改权限
 
-- 配置文件中指定需要扫描的包路径 
-- 定义一些注解，分别表示访问控制层、业务服务层、数据持久层、依赖注入注解、获取配置文件注 
--  从配置文件中获取需要扫描的包路径，获取到当前路径下的文件信息及文件夹信息，我们将当前路 径下所有以.class结尾的文件添加到一个Set集合中进行存储
-- 遍历这个set集合，获取在类上有指定注解的类，并将其交给IOC容器，定义一个安全的Map用来 存储这些对象
-- 遍历这个IOC容器，获取到每一个类的实例，判断里面是有有依赖其他的类的实例，然后进行递归 注入
 
 
+## Maven中Package和Install的区别
 
-## spring是什么?
-
-轻量级的开源的J2EE框架。它是一个容器框架，用来装javabean(java对象)，中间层框架(万能胶) 可以起一个连接作用，比如说把Struts和hibernate粘合在一起运用，可以让我们的企业开发更快、更简 洁
-
-Spring是一个轻量级的控制反转(IoC)和面向切面(AOP)的容器框架
-
-- 从大小与开销两方面而言Spring都是轻量级的。
-- 通过控制反转(IoC)的技术达到松耦合的目的
-- 提供了面向切面编程的丰富支持，允许通过分离应用的业务逻辑与系统级服务进行内聚性的 
-
-开发
-
-- 包含并管理应用对象(Bean)的配置和生命周期，这个意义上是一个容器。
-- 将简单的组件配置、组合成为复杂的应用，这个意义上是一个框架。
-
-
-
-## 谈谈你对AOP（面向切面编程）的理解
-
-系统是由许多不同的组件所组成的，每一个组件各负责一块特定功能。除了实现自身核心功能之外，这些组件还经常承担着额外的职责。例如日志、事务管理和安全这样的核心服务经常融入到自身具有核心业务逻辑的组件中去。这些系统服务经常被称为横切关注点，因为它们会跨越系统的多个组件。
-
-当我们需要为分散的对象引入公共行为的时候，OOP则显得无能为力。也就是说，OOP允许你定义从 上到下的关系，但并不适合定义从左到右的关系。例如日志功能。
-
-日志代码往往水平地散布在所有对象层次中，而与它所散布到的对象的核心功能毫无关系。
-
- 在OOP设计中，它导致了大量代码的重复，而不利于各个模块的重用。
-
-AOP:将程序中的交叉业务逻辑(比如安全，日志，事务等)，封装成一个切面，然后注入到目标对象 (具体业务逻辑)中去。AOP可以对某个对象或某些对象的功能进行增强，比如对象中的方法进行增 强，可以在执行某个方法之前额外的做一些事情，在某个方法执行之后额外的做一些事情
-
-
-
-## 谈谈你对IOC的理解
-
-容器概念、控制反转、依赖注入
-
-**ioc容器:**
-
-实际上就是个map(key，value)，里面存的是各种对象(在xml里配置的bean节点、 @repository、@service、@controller、@component)，在项目启动的时候会读取配置文件里面的 bean节点，根据全限定类名使用反射创建对象放到map里、扫描到打上上述注解的类还是通过反射创 建对象放到map里。
-
-这个时候map里就有各种对象了，接下来我们在代码里需要用到里面的对象时，再通过DI注入 (autowired、resource等注解，xml里bean节点内的ref属性，项目启动的时候会读取xml节点ref属性 根据id注入，也会扫描这些注解，根据类型或id注入;id就是对象名)。
-
-
-
-**控制反转:** 
-
-没有引入IOC容器之前，对象A依赖于对象B，那么对象A在初始化或者运行到某一点的时候，自己必须主动去创建对象B或者使用已经创建的对象B。无论是创建还是使用对象B，控制权都在自己手上。
-
-引入IOC容器之后，对象A与对象B之间失去了直接联系，当对象A运行到需要对象B的时候，IOC容器会主动创建一个对象B注入到对象A需要的地方。（此时A和B都依赖于IOC容器）
-
-通过前后的对比，不难看出来:对象A获得依赖对象B的过程,由主动行为变为了被动行为，控制权颠倒过来了，这就是“控制反转”这个名称的由来。
-
-全部对象的控制权全部上缴给“第三方”IOC容器，所以，IOC容器成了整个系统的关键核心，它起到了一 种类似“粘合剂”的作用，把系统中的所有对象粘合在一起发挥作用，如果没有这个“粘合剂”，对象与对 象之间会彼此失去联系，这就是有人把IOC容器比喻成“粘合剂”的由来。
-
-
-
-**依赖注入:**
-
-“获得依赖对象的过程被反转了”。控制被反转之后，获得依赖对象的过程由自身管理变为了由IOC容器 主动注入。依赖注入是实现IOC的方法，就是由IOC容器在运行期间，动态地将某种依赖关系注入到对 象之中。
-
-
-
-## BeanFactory和ApplicationContext有什么区别?
-
-ApplicationContext是BeanFactory的子接口
-
-ApplicationContext提供了更完整的功能:
-
-1. 继承MessageSource，因此支持国际化。
-2. 统一的资源文件访问方式。
-3. 提供在监听器中注册bean的事件。
-4. 同时加载多个配置文件。
-5. 载入多个(有继承关系)上下文 ，使得每一个上下文都专注于一个特定的层次，比如应用的web层。
-
-
-
-- BeanFactroy采用的是延迟加载形式来注入Bean的，即只有在使用到某个Bean时(调用 getBean())，才对该Bean进行加载实例化。这样，我们就不能发现一些存在的Spring的配置问 题。如果Bean的某一个属性没有注入，BeanFacotry加载后，直至第一次使用调用getBean方法 才会抛出异常。
-
-- ApplicationContext，它是在容器启动时，一次性创建了所有的Bean。这样，在容器启动时，我 们就可以发现Spring中存在的配置错误，这样有利于检查所依赖属性是否注入。 
-
-  ApplicationContext启动后预载入所有的单实例Bean，通过预载入单实例bean ,确保当你需要的 时候，你就不用等待，因为它们已经创建好了。
-
--  相对于基本的BeanFactory，ApplicationContext 唯一的不足是占用内存空间。当应用程序配置 Bean较多时，程序启动较慢。 
-
-- BeanFactory通常以编程的方式被创建，ApplicationContext还能以声明的方式创建，如使用 ContextLoader。 
-
-- BeanFactory和ApplicationContext都支持BeanPostProcessor、BeanFactoryPostProcessor的 使用，但两者之间的区别是:BeanFactory需要手动注册，而ApplicationContext则是自动注册。
-
-
-
-## 描述一下Spring Bean的生命周期?
-
-1. 解析类得到BeanDefinition
-2. 如果有多个构造方法，则要推断构造方法
-3. 确定好构造方法后，进行实例化得到一个对象 
-4. 对对象中的加了@Autowired注解的属性进行属性填充 
-5. 回调Aware方法，比如BeanNameAware，BeanFactoryAware
-6. 调用BeanPostProcessor的初始化前的方法
-7. 调用初始化方法
-8. 调用BeanPostProcessor的初始化后的方法，在这里会进行AOP
-9. 如果当前创建的bean是单例的则会把bean放入单例池
-10. 使用bean
-11. Spring容器关闭时调用DisposableBean中destory()方法
-
-
-
-## 解释下Spring支持的几种bean的作用域。
-
-- singleton:默认，每个容器中只有一个bean的实例，单例的模式由BeanFactory自身来维护。该对象的生命周期是与Spring IOC容器一致的(但在第一次被注入时才会创建)。
-- prototype:为每一个bean请求提供一个实例。在每次注入时都会创建一个新的对象
-- request:bean被定义为在每个HTTP请求中创建一个单例对象，也就是说在单个请求中都会复用 这一个单例对象。
-- session:与request范围类似，确保每个session中有一个bean的实例，在session过期后，bean 会随之失效。（在request和session中的实例是单例的）
-- application:bean被定义为在ServletContext的生命周期中复用一个单例对象。 
-- websocket:bean被定义为在websocket的生命周期中复用一个单例对象。
-- global-session:全局作用域，global-session和Portlet应用相关。当你的应用部署在Portlet容器 中工作时，它包含很多portlet。如果你想要声明让所有的portlet共用全局的存储变量的话，那么 这全局变量需要存储在global-session中。全局作用域与Servlet中的session作用域效果相同。
-
-
-
-## Spring框架中的单例Bean是线程安全的么?
-
-Spring中的Bean默认是单例模式的，框架并没有对bean进行多线程的封装处理。
-
-如果Bean是有状态的 那就需要开发人员自己来进行线程安全的保证，最简单的办法就是改变bean的作 用域 把 "singleton"改为’‘protopyte’ 这样每次请求Bean就相当于是 new Bean() 这样就可以保证线程的 安全了。
-
-- 有状态就是有数据存储功能
-- 无状态就是不会保存数据 controller、service和dao层本身并不是线程安全的，只是如果只 是调用里面的方法，而且多线程调用一个实例的方法，会在内存中复制变量，这是自己的线程的工 作内存，是安全的。
-
-Dao会操作数据库Connection，Connection是带有状态的，比如说数据库事务，Spring的事务管理器 使用Threadlocal为不同线程维护了一套独立的connection副本，保证线程之间不会互相影响(Spring 是如何保证事务获取同一个Connection的)
-
-不要在bean中声明任何有状态的实例变量或类变量，如果必须如此，那么就使用ThreadLocal把变量变 为线程私有的，如果bean的实例变量或类变量需要在多个线程之间共享，那么就只能使用 synchronized、lock、CAS等这些实现线程同步的方法了。
-
-
-
-## Spring框架中都用到了哪些设计模式?
-
-- 简单工厂:由一个工厂类根据传入的参数，动态决定应该创建哪一个产品类。Spring中的BeanFactory就是简单工厂模式的体现，根据传入一个唯一的标识来获得Bean对象，但是否是 在传入参数后创建还是传入参数前创建这个要根据具体情况来定。
-
-- 工厂方法:实现了FactoryBean接口的bean是一类叫做factory的bean。其特点是，spring会在使用getBean()调 用获得该bean时，会自动调用该bean的getObject()方法，所以返回的不是factory这个bean，而是这个 bean.getOjbect()方法的返回值。
-
-- 单例模式:保证一个类仅有一个实例，并提供一个访问它的全局访问点。spring对单例的实现: spring中的单例模式完成了后半句话，即提供了全局的访问点BeanFactory。但没 有从构造器级别去控制单例，这是因为spring管理的是任意的java对象。
-
-- 适配器模式:Spring定义了一个适配接口，使得每一种Controller有一种对应的适配器实现类，让适配器代替 controller执行相应的方法。这样在扩展Controller时，只需要增加一个适配器类就完成了SpringMVC 的扩展了。
-
-- 装饰器模式:动态地给一个对象添加一些额外的职责。就增加功能来说，Decorator模式相比生成子类 更为灵活。Spring中用到的包装器模式在类名上有两种表现:一种是类名中含有Wrapper，另一种是类名中含有 Decorator。
-
-- 动态代理:切面在应用运行的时刻被织入。一般情况下，在织入切面时，AOP容器会为目标对象创建动态的创建一个代理 对象。SpringAOP就是以这种方式织入切面的。
-
-  ```
-  织入:把切面应用到目标对象并创建新的代理对象的过程。
-  ```
-
-- 观察者模式:spring的事件驱动模型使用的是 观察者模式 ，Spring中Observer模式常用的地方是listener的实现。
-
-- 策略模式:Spring框架的资源访问Resource接口。该接口提供了更强的资源访问能力，Spring 框架本身大量使用了 Resource 接口来访问底层资源。
-
-- 模板方法:父类定义了骨架(调用哪些方法及顺序)，某些特定方法由子类实现。
-
-  - 最大的好处:代码复用，减少重复代码。除了子类要实现的特定方法，其他方法及方法调用顺序都在父类中预先写好了。
-  - refresh方法
-
-
-
-## Spring事务的实现方式和原理以及隔离级别?
-
-在使用Spring框架时，可以有两种使用事务的方式，一种是编程式的（自己写代码来控制事务），一种是申明式的，@Transactional注解就是申明式的。
-
-首先，事务这个概念是数据库层面的，Spring只是基于数据库中的事务进行了扩展，以及提供了一些能让程序员更加方便操作事务的方式。
-
-比如我们可以通过在某个方法上增加@Transactional注解，就可以开启事务，这个方法中所有的sql都 会在一个事务中执行，统一成功或失败。
-
-在一个方法上加了@Transactional注解后，Spring会基于这个类生成一个代理对象，会将这个代理对象 作为bean，当在使用这个代理对象的方法时，如果这个方法上存在@Transactional注解，那么代理逻 辑会先把事务的自动提交设置为false，然后再去执行原本的业务逻辑方法，如果执行业务逻辑方法没有 出现异常，那么代理逻辑中就会将事务进行提交，如果执行业务逻辑方法出现了异常，那么则会将事务 进行回滚。
-
-当然，针对哪些异常回滚事务是可以配置的，可以利用@Transactional注解中的rollbackFor属性进行 配置，默认情况下会对RuntimeException和Error进行回滚。
-
-spring事务隔离级别就是数据库的隔离级别:外加一个默认级别
-
-- read uncommitted(未提交读)
-- read committed(提交读、不可重复读) 
-- repeatable read(可重复读) 
-- serializable(可串行化)
-
-```
-数据库的配置隔离级别是Read Commited,而Spring配置的隔离级别是Repeatable Read，请问这时隔离 级别是以哪一个为准? 以Spring配置的为准，如果spring设置的隔离级别数据库不支持，效果取决于数据库
-```
-
-
-
-
-
-## spring事务传播机制
-
-多个事务方法相互调用时,事务如何在这些方法间传播
-
-```
-方法A是一个事务的方法，方法A执行过程中调用了方法B，那么方法B有无事务以及方法B对事务的要求不同都 会对方法A的事务具体执行造成影响，同时方法A的事务对方法B的事务执行也有影响，这种影响具体是什么就 由两个方法所定义的事务传播类型所决定。 								 				
-```
-
-REQUIRED(Spring默认的事务传播类型):如果当前没有事务，则自己新建一个事务，如果当前存在事 务，则加入这个事务
-
-SUPPORTS:当前存在事务，则加入当前事务，如果当前没有事务，就以非事务方法执行 
-
-MANDATORY:当前存在事务，则加入当前事务，如果当前事务不存在，则抛出异常。 
-
-REQUIRES_NEW:创建一个新事务，如果存在当前事务，则挂起该事务。 
-
-NOT_SUPPORTED:以非事务方式执行,如果当前存在事务，则挂起当前事务
-
-NEVER:不使用事务，如果当前事务存在，则抛出异常 
-
-NESTED:如果当前事务存在，则在嵌套事务中执行，否则REQUIRED的操作一样(开启一个事务)
-
-```
-和REQUIRES_NEW的区别 
-REQUIRES_NEW是新建一个事务并且新开启的这个事务与原有事务无关，而NESTED则是当前存在事务时(我 们把当前事务称之为父事务)会开启一个嵌套事务(称之为一个子事务)。 在NESTED情况下父事务回滚时， 子事务也会回滚，而在REQUIRES_NEW情况下，原有事务回滚，不会影响新开启的事务。 	
-
-和REQUIRED的区别 
-REQUIRED情况下，调用方存在事务时，则被调用方和调用方使用同一事务，那么被调用方出现异常时，由于 共用一个事务，所以无论调用方是否catch其异常，事务都会回滚 而在NESTED情况下，被调用方发生异常 时，调用方可以catch其异常，这样只有子事务回滚，父事务不受影响 
-```
-
-
-
-## spring事务什么时候会失效？
-
-spring事务的原理是AOP，进行了切面增强，那么失效的根本原因是这个AOP不起作用了!常见情况有如下几种
-
-1. 发生自调用，类里面使用this调用本类的方法(this通常省略)，此时这个this对象不是代理类，而 是UserService对象本身!解决方法很简单，让那个this变成UserService的代理类即可!
-
-2. 方法不是public的
-
-   ```
-   @Transactional 只能用于 public 的方法上，否则事务不会失效，如果要用在非 public 方法上，可 以开启 AspectJ 代理模式。
-   ```
-
-3. 数据库不支持事务
-
-4. 没有被spring管理
-
-5. 异常被吃掉，事务不会回滚(或者抛出的异常没有被定义，默认为RuntimeException)
-
-
-
-
-
-## 什么是bean的自动装配，有哪些方式? 
-
-开启自动装配，只需要在xml配置文件中定义“autowire”属性。
-
-```
-<bean id="cutomer" class="com.xxx.xxx.Customer" autowire="" />
-```
-
-autowire属性有五种装配的方式:
-
-- no – 缺省情况下，自动配置是通过“ref”属性手动设定 。
-
-  ```
-  手动装配:以value或ref的方式明确指定属性值都是手动装配。 
-  需要通过‘ref’属性来连接bean。
-  ```
-
-- byName-根据bean的属性名称进行自动装配。
-
-  ```
-  Cutomer的属性名称是person，Spring会将bean id为person的bean通过setter方法进行自动装 配。
-  <bean id="cutomer" class="com.xxx.xxx.Cutomer" autowire="byName"/>
-  <bean id="person" class="com.xxx.xxx.Person"/>
-  ```
-
-- byType-根据bean的类型进行自动装配。
-
-  ```
-  Cutomer的属性person的类型为Person，Spirng会将Person类型通过setter方法进行自动装配。 <bean id="cutomer" class="com.xxx.xxx.Cutomer" autowire="byType"/>
-  <bean id="person" class="com.xxx.xxx.Person"/>
-  ```
-
-- constructor-类似byType，不过是应用于构造器的参数。如果一个bean与构造器参数的类型形 同，则进行自动装配，否则导致异常。
-
-  ```
-  Cutomer构造函数的参数person的类型为Person，Spirng会将Person类型通过构造方法进行自动装 配。
-  <bean id="cutomer" class="com.xxx.xxx.Cutomer" autowire="construtor"/> <bean id="person" class="com.xxx.xxx.Person"/>
-  ```
-
-- autodetect-如果有默认的构造器，则通过constructor方式进行自动装配，否则使用byType方式 进行自动装配。
-
-  ```
-  如果有默认的构造器，则通过constructor方式进行自动装配，否则使用byType方式进行自动装配。
-  ```
-
-@Autowired自动装配bean，可以在字段、setter方法、构造函数上使用。
-
-
-
-
-
-# springmvc、springBoot
-
-## Spring Boot、Spring MVC和**Spring** 有什么区别
-
-spring是一个IOC容器，用来管理Bean，使用依赖注入实现控制反转，可以很方便的整合各种框架，提 供AOP机制弥补OOP的代码重复问题、更方便将不同类不同方法中的共同处理抽取成切面、自动注入给 方法执行，比如日志、异常等
-
-springmvc是spring对web框架的一个解决方案，提供了一个总的前端控制器Servlet，用来接收请求， 然后定义了一套路由策略(url到handle的映射)及适配执行handle，将handle结果使用视图解析技术 生成视图展现给前端
-
-springboot是spring提供的一个快速开发工具包，让程序员能更方便、更快速的开发spring+springmvc 应用，简化了配置(约定了默认配置)，整合了一系列的解决方案(starter机制)、redis、 mongodb、es，可以开箱即用
-
-
-
-## pringMVC 工作流程
-
-> http://c.biancheng.net/spring_mvc/process.html
-
-1. 用户发送请求至前端控制器 DispatcherServlet。 
-2. DispatcherServlet 收到请求调用 HandlerMapping 处理器映射器。
-3. 处理器映射器找到具体的处理器(可以根据 xml 配置、注解进行查找)，生成处理器及处理器拦截器 (如果有则生成)一并返回给 DispatcherServlet。
-4. DispatcherServlet 调用 HandlerAdapter 处理器适配器。
-5. HandlerAdapter 经过适配调用具体的处理器(Controller，也叫后端控制器)
-6. Controller 执行完成返回 ModelAndView。
-7. HandlerAdapter 将 controller 执行结果 ModelAndView 返回给 DispatcherServlet。
-8. DispatcherServlet 将 ModelAndView 传给 ViewReslover 视图解析器。
-9. ViewReslover 解析后返回具体 View。
-10. DispatcherServlet 根据 View 进行渲染视图(即将模型数据填充至视图中)。
-11. DispatcherServlet 响应用户。
-
-![20](img/20.png)
-
-## Spring MVC的主要组件?
-
-Handler:也就是处理器。它直接应对着MVC中的C也就是Controller层，它的具体表现形式有很多，可 以是类，也可以是方法。在Controller层中@RequestMapping标注的所有方法都可以看成是一个 Handler，只要可以实际处理请求就可以是Handler
-
-1. HandlerMapping initHandlerMappings(context)，处理器映射器，根据用户请求的资源uri来查找Handler的。在 SpringMVC中会有很多请求，每个请求都需要一个Handler处理，具体接收到一个请求之后使用哪个 Handler进行，这就是HandlerMapping需要做的事。
-
-2. HandlerAdapter initHandlerAdapters(context)，适配器。因为SpringMVC中的Handler可以是任意的形式，只要能处 理请求就ok，但是Servlet需要的处理方法的结构却是固定的，都是以request和response为参数的方 法。如何让固定的Servlet处理方法调用灵活的Handler来进行处理呢?这就是HandlerAdapter要做的 事情。 
-   Handler是用来干活的工具;HandlerMapping用于根据需要干的活找到相应的工具;HandlerAdapter 是使用工具干活的人。
-
-3. HandlerExceptionResolver
-    initHandlerExceptionResolvers(context)， 其它组件都是用来干活的。在干活的过程中难免会出现问 题，出问题后怎么办呢?这就需要有一个专门的角色对异常情况进行处理，在SpringMVC中就是 HandlerExceptionResolver。具体来说，此组件的作用是根据异常设置ModelAndView，之后再交给 render方法进行渲染。
-
-4. ViewResolver 
-   initViewResolvers(context)，ViewResolver用来将String类型的视图名和Locale解析为View类型的视 图。View是用来渲染页面的，也就是将程序返回的参数填入模板里，生成html(也可能是其它类型) 文件。这里就有两个关键问题:使用哪个模板?用什么技术(规则)填入参数?这其实是ViewResolver 主要要做的工作，ViewResolver需要找到渲染所用的模板和所用的技术(也就是视图的类型)进行渲 染，具体的渲染过程则交由不同的视图自己完成。
-
-5. RequestToViewNameTranslator
-   initRequestToViewNameTranslator(context)，ViewResolver是根据ViewName查找View，但有的 Handler处理完后并没有设置View也没有设置ViewName，这时就需要从request获取ViewName了， 如何从request中获取ViewName就是RequestToViewNameTranslator要做的事情了。 RequestToViewNameTranslator在Spring MVC容器里只可以配置一个，所以所有request到 ViewName的转换规则都要在一个Translator里面全部实现。
-
-6. LocaleResolver
-   initLocaleResolver(context)， 解析视图需要两个参数:一是视图名，另一个是Locale。视图名是处理 器返回的，Locale是从哪里来的?这就是LocaleResolver要做的事情。LocaleResolver用于从request 解析出Locale，Locale就是zh-cn之类，表示一个区域，有了这个就可以对不同区域的用户显示不同的 结果。SpringMVC主要有两个地方用到了Locale:一是ViewResolver视图解析的时候;二是用到国际化 资源或者主题的时候。
-
-7. ThemeResolver 
-   initThemeResolver(context)，用于解析主题。SpringMVC中一个主题对应一个properties文件，里面 存放着跟当前主题相关的所有资源、如图片、css样式等。SpringMVC的主题也支持国际化，同一个主 题不同区域也可以显示不同的风格。SpringMVC中跟主题相关的类有 ThemeResolver、ThemeSource 和Theme。主题是通过一系列资源来具体体现的，要得到一个主题的资源，首先要得到资源的名称，这 是ThemeResolver的工作。然后通过主题名称找到对应的主题(可以理解为一个配置)文件，这是 ThemeSource的工作。最后从主题中获取资源就可以了。
-
-8. MultipartResolver 
-   initMultipartResolver(context)，用于处理上传请求。处理方法是将普通的request包装成 MultipartHttpServletRequest，后者可以直接调用getFile方法获取File，如果上传多个文件，还可以调 用getFileMap得到FileName->File结构的Map。此组件中一共有三个方法，作用分别是判断是不是上传 请求，将request包装成MultipartHttpServletRequest、处理完后清理上传过程中产生的临时资源。
-
-9. FlashMapManager 
-   initFlashMapManager(context)，用来管理FlashMap的，FlashMap主要用在redirect中传递参数。
-
-   
-
-## Spring Boot 自动配置原理?
-
-@Import + @Configuration + Spring spi
-
-自动配置类由各个starter提供，使用@Configuration + @Bean定义配置类，放到META- INF/spring.factories下
-
-使用Spring spi扫描META-INF/spring.factories下的配置类 
-
-使用@Import导入自动配置类
-
-![21](img/21.png)
-
-
-
-## 如何理解Spring Boot中的Starter
-
-使用spring + springmvc使用，如果需要引入mybatis等框架，需要到xml中定义mybatis需要的bean
-
-starter就是定义一个starter的jar包，写一个@Configuration配置类、将这些bean定义在里面，然后在 starter包的META-INF/spring.factories中写入该配置类，springboot会按照约定来加载该配置类
-
-开发人员只需要将相应的starter包依赖进应用，进行相应的属性配置(使用默认配置时，不需要配 置)，就可以直接进行代码开发，使用对应的功能了，比如mybatis-spring-boot--starter，spring- boot-starter-redis
-
-## 什么是嵌入式服务器?为什么要使用嵌入式服务器？
-
-节省了下载安装tomcat，应用也不需要再打war包，然后放到webapp目录下再运行
-
-只需要一个安装了 Java 的虚拟机，就可以直接在上面部署应用程序了
-
-springboot已经内置了tomcat.jar，运行main方法时会去启动tomcat，并利用tomcat的spi机制加载 springmvc
+1. Package是打包，打成Jar或War
+2. Instal表 示将Jar或War安装到本地仓库中
