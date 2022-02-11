@@ -117,7 +117,7 @@ B+树:
 
 B+树是一个平衡的多叉树，从根节点到每个叶子节点的高度差值不超过1，而且同层级的节点间有指针 相互链接。在B+树上的常规检索，从根节点到叶子节点的搜索效率基本相当，不会出现大幅波动，而且 基于索引的顺序扫描时，也可以利用双向指针快速左右移动，效率非常高。因此，B+树索引被广泛应用 于数据库、文件系统等场景。
 
-![22](file:///Users/taozehua/Downloads/%E9%9D%A2%E8%AF%95/Interview-Java/img/22.png?lastModify=1644568537)
+![22](img/22.png)
 
 
 
@@ -125,7 +125,7 @@ B+树是一个平衡的多叉树，从根节点到每个叶子节点的高度差
 
 哈希索引就是采用一定的哈希算法，把键值换算成新的哈希值，检索时不需要类似B+树那样从根节点到 叶子节点逐级查找，只需一次哈希算法即可立刻定位到相应的位置，速度非常快
 
-![23](file:///Users/taozehua/Downloads/%E9%9D%A2%E8%AF%95/Interview-Java/img/23.png?lastModify=1644568537)
+![23](img/23.png)
 
 如果是等值查询，那么哈希索引明显有绝对优势，因为只需要经过一次算法即可找到相应的键值;前提 是键值都是唯一的。如果键值不是唯一的，就需要先找到该键所在位置，然后再根据链表往后扫描，直 到找到相应的数据;
 
@@ -329,7 +329,7 @@ MVCC只在 READ COMMITTED 和 REPEATABLE READ 两个隔离级别下工作。其�
 
 **已提交读和可重复读的区别就在于它们生成ReadView的策略不同**。
 
-![24](file:///Users/taozehua/Downloads/%E9%9D%A2%E8%AF%95/Interview-Java/img/24.png?lastModify=1644568537)
+![24](img/24.png)
 
 开始事务时创建readview，readView维护当前活动的事务id，即未提交的事务id，排序生成一个数组
 
@@ -462,7 +462,7 @@ Mysql的主从复制中主要有三个线程：master（binlog dump thread）、
 
 EXPLAIN SELECT * from A where X=? and Y=?
 
-![25](file:///Users/taozehua/Downloads/%E9%9D%A2%E8%AF%95/Interview-Java/img/25.png?lastModify=1644568537)
+![25](img/25.png)
 
 1. id ：是一个有顺序的编号，是查询的顺序号，有几个 select 就显示几行。id的顺序是按 select 出现的顺序增长的。id列的值越大执行优先级越高越先执行，id列的值相同则从上往下执行，id列的值为NULL后执行。
 

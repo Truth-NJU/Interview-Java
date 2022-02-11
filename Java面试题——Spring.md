@@ -26,7 +26,7 @@ Spring本身并没有针对Bean做线程安全的处理，所以:
    BenaFactoryPostProcessor来实现的，依赖注入就是通过BeanPostProcessor来实现的
 7. 在Spring启动过程中还会去处理@lmport等注解
 
-![29](/Users/taozehua/Downloads/面试/Interview-Java/img/29.png)
+![29](img/29.png)
 
 
 
@@ -45,7 +45,7 @@ Spring本身并没有针对Bean做线程安全的处理，所以:
 10. Spring事务的传播机制是Spring事务自己实现的，也是Spring事务中最复杂的
 11. Spring事务的传播机制是基于数据库连接来做的，一个数据库连接一个事务，如果传播机制配置为需要新开一个事务，那么实际上就是先建立一个数据库连接， 在此新数据库连接上执行sq|
 
-![30](/Users/taozehua/Downloads/面试/Interview-Java/img/30.png)
+![30](img/30.png)
 
 
 
@@ -97,7 +97,7 @@ Spring中的后置处理器分为BeanFactory后置处理器和Bean后置处理�
 BeanFactory处理器来加工BeanFactory,比如Spring的扫描就是基于BeanFactory后置处理器来实现
 的，而Bean后置处理器也类似，Spring在 创建一个Bean的过程中， 首先会实例化得到一一个对象，然后再利用Bean后置处理器来对该实例对象进行加工，比如我们常说的依赖注入就是基于一个Bean后置处理器来实现的，通过该Bean后置处理器来给实例对象中加了@Autowired注解的属性自动赋值，还比如我们常说的AOP，也是利用一个Bean后置处理器来实现的，基于原实例对象，判断是否需要进行AOP，如果需要，那么就基于原实例对象进行动态代理，生成一个代理对象。
 
-![33](/Users/taozehua/Downloads/面试/Interview-Java/img/33.png)
+![33](img/33.png)
 
 
 
@@ -135,7 +135,7 @@ AOP:将程序中的交叉业务逻辑(比如安全，日志，事务等)，封�
 利用动态代理技术来实现AOP，比如JDK动态代理或Cglib动态代理，利用动态代理技术，可以针对某个类生成代理对象，当调用代理对象的某个方法时，可以任意控制该方法的执行，比如可以先打印执行时间，再执行该方法，并且该方法执行完成后，再次打印执行时间。
 项目中，比如事务、权限控制、方法执行时长日志都是通过AOP技术来实现的，凡是需要对某些方法做统一处理的都可以用AOP来实现，利用AOP可以做到业务无侵入。
 
-![32](/Users/taozehua/Downloads/面试/Interview-Java/img/32.png)
+![32](img/32.png)
 
 
 
@@ -429,7 +429,7 @@ springboot是spring提供的一个快速开发工具包，让程序员能更方�
 10. DispatcherServlet 根据 View 进行渲染视图(即将模型数据填充至视图中)。
 11. DispatcherServlet 响应用户。
 
-![20](/Users/taozehua/Downloads/面试/Interview-Java/img/20.png)
+![20](img/20.png)
 
 ## Spring MVC的主要组件?
 
@@ -473,7 +473,7 @@ Handler:也就是处理器。它直接应对着MVC中的C也就是Controller层�
 
 使用@Import导入自动配置类
 
-![21](/Users/taozehua/Downloads/面试/Interview-Java/img/21.png)
+![21](img/21.png)
 
 
 
